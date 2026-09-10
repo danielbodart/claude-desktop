@@ -30,6 +30,20 @@ runs:
           /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
         df -h /
 
+    # Ubuntu 23.10 and later use AppArmor to stop unprivileged processes
+    # creating user namespaces, which leaves Chromium with no sandbox at all
+    # once the setuid helper is gone. Anthropic's own postinst works around it
+    # by installing an unconfined profile for the app.
+    #
+    # NixOS does not apply that restriction, so lifting it here makes the
+    # runner behave like the systems this package targets, and the smoke test
+    # below exercises the same namespace sandbox a user would get.
+    - name: Allow unprivileged user namespaces
+      shell: bash
+      run: |
+        sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+        sudo sysctl -w kernel.unprivileged_userns_clone=1 || true
+
     - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
       with:
         extra_nix_config: |
