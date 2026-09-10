@@ -190,12 +190,27 @@ nix flake check          # builds the package, runs shellcheck, checks the pin
 ./scripts/update.sh --force   # rewrite even when already current
 ```
 
-### Binary cache
+## Binary cache
 
-There is no public cache yet, so the first build downloads a 170 MB `.deb` and
-patches it locally. Set a `CACHIX_AUTH_TOKEN` repository secret and CI will
-push both architectures to a Cachix cache named `claude-desktop-nix`; without
-the secret it builds and pushes nothing.
+CI pushes both architectures to `https://danielbodart.cachix.org`, so you can
+substitute the build instead of downloading a 170 MB `.deb` and patching it
+yourself.
+
+The flake offers the cache through `nixConfig`, which Nix applies only if you
+are a trusted user and otherwise reports as ignored. On NixOS the reliable
+place to put it is your own configuration:
+
+```nix
+nix.settings = {
+  substituters = [ "https://danielbodart.cachix.org" ];
+  trusted-public-keys = [
+    "danielbodart.cachix.org-1:751qv4GxLFJCThWMEw1WL6kUqY0DpF6oqPqsLKnnEwU="
+  ];
+};
+```
+
+Everything else in the closure comes from `cache.nixos.org` as usual. Only the
+Claude Desktop output itself is unique to this cache.
 
 ## Not covered
 

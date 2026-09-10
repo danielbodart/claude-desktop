@@ -10,8 +10,8 @@ inputs:
     required: true
   cachix-auth-token:
     description: >-
-      Cachix token. Optional: without one the build still runs, it just is not
-      pushed anywhere.
+      Write token for the danielbodart Cachix cache. Optional: without one the
+      build still runs, it just is not pushed anywhere.
     required: false
     default: ""
   github-token:
@@ -53,7 +53,7 @@ runs:
     - uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
       if: inputs.cachix-auth-token != ''
       with:
-        name: claude-desktop-nix
+        name: danielbodart
         authToken: ${{ inputs.cachix-auth-token }}
 
     - name: nix flake check

@@ -5,6 +5,17 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
+  # Offered, not imposed. Nix applies these only for a trusted user, and
+  # otherwise says it is ignoring them. See the README for setting the
+  # substituter in a NixOS configuration instead, which is what most people
+  # actually want.
+  nixConfig = {
+    extra-substituters = [ "https://danielbodart.cachix.org" ];
+    extra-trusted-public-keys = [
+      "danielbodart.cachix.org-1:751qv4GxLFJCThWMEw1WL6kUqY0DpF6oqPqsLKnnEwU="
+    ];
+  };
+
   outputs =
     { self, nixpkgs }:
     let
