@@ -1,17 +1,17 @@
 {
-  "version": "1.52386.0",
+  "version": "1.52386.3",
   "sources": {
     "x86_64-linux": {
       "debianArch": "amd64",
-      "url": "https://downloads.claude.ai/claude-desktop/apt/stable/pool/main/c/claude-desktop/claude-desktop_1.52386.0_amd64.deb",
-      "hash": "sha256-nF0RPqLDHA1PYHXALmGAv0q1PTVza5pJfODoT2LpZUs=",
-      "size": 172390480
+      "url": "https://downloads.claude.ai/claude-desktop/apt/stable/pool/main/c/claude-desktop/claude-desktop_1.52386.3_amd64.deb",
+      "hash": "sha256-eXWUzoHBnT9rU3P9uAFpnHVwFvVgBxX6F1HsNOhohFY=",
+      "size": 172377212
     },
     "aarch64-linux": {
       "debianArch": "arm64",
-      "url": "https://downloads.claude.ai/claude-desktop/apt/stable/pool/main/c/claude-desktop/claude-desktop_1.52386.0_arm64.deb",
-      "hash": "sha256-ccfTKo7e5Xhw21T1mkVb0F+SsuGLRaFRC2ypCZ69d9c=",
-      "size": 165674372
+      "url": "https://downloads.claude.ai/claude-desktop/apt/stable/pool/main/c/claude-desktop/claude-desktop_1.52386.3_arm64.deb",
+      "hash": "sha256-M5YEVgSwGVgWIbB4ZVcWCd1vy3NAoukyjvAxaF0oIvs=",
+      "size": 165580736
     }
   }
 }
