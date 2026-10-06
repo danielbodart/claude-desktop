@@ -21,8 +21,9 @@ inputs:
 runs:
   using: composite
   steps:
-    # The closure is around 3 GB with QEMU, and the runner image leaves less
-    # free than that on / once its own toolchains are counted.
+    # The closure itself is under 1 GB, but `nix flake check` also builds
+    # qemu-cowork from source and fetches its build inputs, and the runner
+    # image leaves little free on / once its own toolchains are counted.
     - name: Reclaim runner disk space
       shell: bash
       run: |

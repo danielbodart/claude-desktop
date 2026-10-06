@@ -19,7 +19,6 @@
   gdk-pixbuf,
   glib,
   gtk3,
-  libayatana-appindicator,
   libcap_ng,
   libdrm,
   libgbm,
@@ -39,23 +38,25 @@
   libxrandr,
   libxshmfence,
   libxtst,
-  mesa,
   nspr,
   nss,
   pango,
-  systemd,
+  systemdLibs,
   util-linux,
   vulkan-loader,
-  xdg-utils,
   gjs,
-  qemu,
+  callPackage,
   # Cowork runs agentic sessions in a QEMU/KVM virtual machine that the app
-  # starts itself, looking for `qemu-system-*` on PATH. Including it matches
-  # what `apt install claude-desktop` does, at the cost of QEMU's closure.
-  # Set to false for a chat-and-code-only build.
+  # starts itself, looking for `qemu-system-*` on PATH. The wrapper puts a
+  # headless, host-only QEMU there (nix/qemu-cowork.nix), so it works out of
+  # the box the way `apt install claude-desktop` does. Set to false for a
+  # chat-and-code-only build, which also drops the VM payload.
   withCowork ? true,
+  qemu-cowork ? callPackage ./nix/qemu-cowork.nix { },
+  xdg-shims ? callPackage ./nix/xdg-shims.nix { },
   # The GNOME Shell search provider is a GJS script the shell activates over
-  # D-Bus. Harmless elsewhere, but it does pull in GJS.
+  # D-Bus. It lives in its own `searchProvider` output, so GJS is only in the
+  # closure of those who install that output.
   withGnomeSearchProvider ? true,
   sources ? lib.importJSON ./sources.json,
 }:
@@ -73,6 +74,12 @@ in
 stdenv.mkDerivation (finalAttrs: {
   pname = "claude-desktop";
   version = sources.version;
+
+  outputs = [
+    "out"
+    "doc"
+  ]
+  ++ lib.optional withGnomeSearchProvider "searchProvider";
 
   src = fetchurl {
     inherit (source) url hash;
@@ -99,7 +106,6 @@ stdenv.mkDerivation (finalAttrs: {
     gdk-pixbuf
     glib
     gtk3
-    libayatana-appindicator
     libdrm
     libgbm
     libGL
@@ -116,15 +122,17 @@ stdenv.mkDerivation (finalAttrs: {
     libxrandr
     libxshmfence
     libxtst
-    mesa
     nspr
     nss
     pango
-    (lib.getLib systemd)
+    # libudev and libsystemd only; `lib.getLib systemd` is the whole of
+    # systemd, since it has no separate lib output.
+    systemdLibs
     util-linux
-
-    # Wanted by the virtiofsd that Cowork falls back to when the host has none
-    # of its own.
+  ]
+  # Wanted by the virtiofsd that Cowork falls back to when the host has none
+  # of its own.
+  ++ lib.optionals withCowork [
     libcap_ng
     libseccomp
   ];
@@ -132,7 +140,7 @@ stdenv.mkDerivation (finalAttrs: {
   # Loaded with dlopen at runtime rather than linked, so autoPatchelfHook
   # cannot see the need for them from the ELF headers.
   runtimeDependencies = [
-    (lib.getLib systemd)
+    systemdLibs
     libglvnd
     libnotify
     libsecret
@@ -165,6 +173,18 @@ stdenv.mkDerivation (finalAttrs: {
     cp -r usr/${appDir}/. "$out/${appDir}/"
     cp -r usr/share/icons "$out/share/icons"
 
+    # 20 MiB of HTML nothing reads at runtime.
+    mkdir -p "$doc/share/doc/claude-desktop"
+    mv "$out/${appDir}/LICENSES.chromium.html" "$doc/share/doc/claude-desktop/"
+  ''
+  + lib.optionalString (!withCowork) ''
+    # The VM disk, virtiofsd and helper are dead weight without QEMU.
+    rm "$out/${appDir}/resources/smol-bin."*.img \
+      "$out/${appDir}/resources/virtiofsd" \
+      "$out/${appDir}/resources/cowork-linux-helper"
+  ''
+  + ''
+
     # The bare `claude-desktop` in Exec= resolves against a Debian $PATH.
     # Point the entry and both of its actions at the wrapper instead, so a
     # launcher finds the app without the profile having to be on PATH.
@@ -180,7 +200,8 @@ stdenv.mkDerivation (finalAttrs: {
   postFixup = ''
     makeShellWrapper "$out/${appDir}/claude-desktop" "$out/bin/claude-desktop" \
       "''${gappsWrapperArgs[@]}" \
-      --prefix PATH : ${lib.makeBinPath ([ xdg-utils ] ++ lib.optional withCowork qemu)} \
+      ${lib.optionalString withCowork "--prefix PATH : ${lib.makeBinPath [ qemu-cowork ]}"} \
+      --suffix PATH : ${lib.makeBinPath [ xdg-shims ]} \
       --prefix LD_LIBRARY_PATH : ${
         lib.makeLibraryPath [
           libglvnd
@@ -192,18 +213,19 @@ stdenv.mkDerivation (finalAttrs: {
   + lib.optionalString withGnomeSearchProvider ''
     # dpkg's postinst copies these two files into place and rewrites nothing,
     # because on Debian the paths it names already exist. Here the D-Bus
-    # service has to point into the store instead.
-    searchProvider="$out/${appDir}/resources/gnome-search-provider"
+    # service has to point into the store instead. Both go in their own
+    # output, so the reference to GJS stays out of the main closure.
+    providerScripts="$out/${appDir}/resources/gnome-search-provider"
 
-    install -Dm644 "$searchProvider/com.anthropic.Claude.search-provider.ini" \
-      "$out/share/gnome-shell/search-providers/com.anthropic.Claude.search-provider.ini"
+    install -Dm644 "$providerScripts/com.anthropic.Claude.search-provider.ini" \
+      "$searchProvider/share/gnome-shell/search-providers/com.anthropic.Claude.search-provider.ini"
 
-    install -Dm644 "$searchProvider/com.anthropic.Claude.SearchProvider.service" \
-      "$out/share/dbus-1/services/com.anthropic.Claude.SearchProvider.service"
+    install -Dm644 "$providerScripts/com.anthropic.Claude.SearchProvider.service" \
+      "$searchProvider/share/dbus-1/services/com.anthropic.Claude.SearchProvider.service"
 
-    substituteInPlace "$out/share/dbus-1/services/com.anthropic.Claude.SearchProvider.service" \
+    substituteInPlace "$searchProvider/share/dbus-1/services/com.anthropic.Claude.SearchProvider.service" \
       --replace-fail "/usr/bin/gjs" "${lib.getExe' gjs "gjs"}" \
-      --replace-fail "/usr/lib/claude-desktop/resources/gnome-search-provider" "$searchProvider"
+      --replace-fail "/usr/lib/claude-desktop/resources/gnome-search-provider" "$providerScripts"
   '';
 
   # wrapGAppsHook3 would otherwise wrap the Electron binary directly, and the
@@ -213,6 +235,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   passthru = {
     inherit (source) url;
+    inherit qemu-cowork;
     updateScript = ./scripts/update.sh;
   };
 
@@ -242,5 +265,6 @@ stdenv.mkDerivation (finalAttrs: {
       "aarch64-linux"
     ];
     mainProgram = "claude-desktop";
+    outputsToInstall = [ "out" ];
   };
 })

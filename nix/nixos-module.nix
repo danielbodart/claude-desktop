@@ -10,18 +10,21 @@ let
   cfg = config.programs.claude-desktop;
 
   # OVMF for x86_64, AAVMF for aarch64. Both come out of the same nixpkgs
-  # attribute; only the file name differs.
+  # attribute; only the file name differs. The app finds the variable store
+  # template by replacing CODE with VARS in the code path, so both are linked.
   firmware =
     if pkgs.stdenv.hostPlatform.isAarch64 then
       {
-        path = "/usr/share/AAVMF/AAVMF_CODE.fd";
-        file = "${pkgs.OVMF.firmware}";
+        code = "/usr/share/AAVMF/AAVMF_CODE.fd";
+        vars = "/usr/share/AAVMF/AAVMF_VARS.fd";
       }
     else
       {
-        path = "/usr/share/OVMF/OVMF_CODE_4M.fd";
-        file = "${pkgs.OVMF.firmware}";
+        code = "/usr/share/OVMF/OVMF_CODE_4M.fd";
+        vars = "/usr/share/OVMF/OVMF_VARS_4M.fd";
       };
+
+  gnome = config.services.desktopManager.gnome.enable;
 in
 {
   options.programs.claude-desktop = {
@@ -32,6 +35,17 @@ in
       default = self.packages.${pkgs.stdenv.hostPlatform.system}.claude-desktop;
       defaultText = lib.literalMD "`claude-desktop` from this flake";
       description = "The claude-desktop package to install.";
+    };
+
+    gnomeSearchProvider = lib.mkOption {
+      type = lib.types.bool;
+      default = gnome && cfg.package ? searchProvider;
+      defaultText = lib.literalExpression "config.services.desktopManager.gnome.enable";
+      description = ''
+        Whether to register Claude as a GNOME Shell search provider. The
+        provider is a separate output of the package, because it is a GJS
+        script and GJS is only worth its closure where GNOME already has it.
+      '';
     };
 
     cowork = {
@@ -65,6 +79,11 @@ in
         services.gnome.gnome-keyring.enable = lib.mkDefault true;
       }
 
+      (lib.mkIf cfg.gnomeSearchProvider {
+        environment.systemPackages = [ cfg.package.searchProvider ];
+        services.dbus.packages = [ cfg.package.searchProvider ];
+      })
+
       (lib.mkIf cfg.cowork.enable {
         boot.kernelModules = [
           "kvm"
@@ -72,11 +91,12 @@ in
         ];
 
         # Cowork resolves QEMU through PATH but hardcodes the firmware location,
-        # so the one FHS path it insists on is linked into place. The bundled
+        # so the FHS paths it insists on are linked into place. The bundled
         # virtiofsd needs no help: the app falls back to its own copy under
         # resources/ when the system has none.
         systemd.tmpfiles.rules = [
-          "L+ ${firmware.path} - - - - ${firmware.file}"
+          "L+ ${firmware.code} - - - - ${pkgs.OVMF.firmware}"
+          "L+ ${firmware.vars} - - - - ${pkgs.OVMF.variables}"
         ];
 
         users.users = lib.genAttrs cfg.cowork.users (_: {

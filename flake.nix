@@ -52,11 +52,8 @@
         in
         {
           inherit claude-desktop;
+          inherit (claude-desktop) qemu-cowork;
           default = claude-desktop;
-          claude-desktop-minimal = claude-desktop.override {
-            withCowork = false;
-            withGnomeSearchProvider = false;
-          };
         }
       );
 
@@ -80,7 +77,42 @@
           pkgs = pkgsFor system;
         in
         {
-          inherit (self.packages.${system}) claude-desktop claude-desktop-minimal;
+          inherit (self.packages.${system}) claude-desktop qemu-cowork;
+
+          # Cowork's helper builds the QEMU command line itself, so a trimmed
+          # QEMU that has lost a device only fails when someone starts a
+          # session. This boots the helper's exact machine shape under TCG
+          # (no KVM in the build sandbox) and asks QEMU over QMP whether every
+          # device came up. vhost-vsock is left out: it needs /dev/vhost-vsock,
+          # so it is only checked for in `-device help`.
+          qemu-cowork-boots = pkgs.callPackage ./nix/qemu-cowork-test.nix {
+            inherit (self.packages.${system}) claude-desktop qemu-cowork;
+          };
+
+          # The closure is the point of most of package.nix, so a dependency
+          # that quietly drags full QEMU, perl or python back in fails here.
+          closure-is-slim =
+            pkgs.runCommand "claude-desktop-closure-is-slim"
+              {
+                closure = pkgs.closureInfo { rootPaths = [ self.packages.${system}.claude-desktop ]; };
+                maxMiB = 1000;
+              }
+              ''
+                bad=$(grep -E -- '-(qemu-[0-9]|perl-[0-9]|python3-[0-9]|spidermonkey-|gjs-|systemd-[0-9]|xdg-utils-)' \
+                  "$closure/store-paths" || true)
+                if [ -n "$bad" ]; then
+                  echo "unwanted paths in the claude-desktop closure:" >&2
+                  echo "$bad" >&2
+                  exit 1
+                fi
+                size=$(( $(cat "$closure/total-nar-size") / 1048576 ))
+                echo "closure is $size MiB"
+                if [ "$size" -gt "$maxMiB" ]; then
+                  echo "closure is $size MiB, over the $maxMiB MiB budget" >&2
+                  exit 1
+                fi
+                echo "$size MiB" >$out
+              '';
 
           # The version in sources.json has to be the version inside the
           # archive, otherwise the flake is pinning a label rather than a
@@ -132,6 +164,7 @@
                       };
                       system.stateVersion = "26.05";
                       users.users.tester.isNormalUser = true;
+                      services.desktopManager.gnome.enable = true;
                       programs.claude-desktop = {
                         enable = true;
                         cowork = {
