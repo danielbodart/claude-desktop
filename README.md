@@ -193,7 +193,7 @@ claude-desktop.override {
 ## Cowork
 
 Cowork runs longer agentic work in a QEMU virtual machine the app starts
-itself. Three things have to be true, and only one of them can be arranged by a
+itself. Four things have to be true, and only one of them can be arranged by a
 package:
 
 1. **QEMU on `PATH`.** The wrapper does this, unless `withCowork = false`.
@@ -201,14 +201,14 @@ package:
    store template beside it as `OVMF_VARS_4M.fd` (`AAVMF_*` on arm64). The app
    hardcodes those paths with no fallback. `programs.claude-desktop.cowork.enable`
    links the store's OVMF there with tmpfiles rules.
-3. **Access to `/dev/kvm` and `/dev/vhost-vsock`.** Only `kvm` group members
+3. **`virtiofsd` at `/usr/libexec/virtiofsd` or `/usr/bin/virtiofsd`.** The
+   app only falls back to the copy it bundles on Ubuntu 22.04, and otherwise
+   reports Cowork as needing QEMU. The module links the bundled copy there.
+4. **Access to `/dev/kvm` and `/dev/vhost-vsock`.** Only `kvm` group members
    can open the second one, so joining the group is required even where
    `/dev/kvm` is already accessible.
 
-The bundled `virtiofsd` needs no help; the app uses its own copy when the host
-has none.
-
-Off NixOS, arrange 2 and 3 yourself.
+Off NixOS, arrange 2 to 4 yourself.
 
 ## GNOME search
 

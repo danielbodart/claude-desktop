@@ -90,13 +90,16 @@ in
           "vhost_vsock"
         ];
 
-        # Cowork resolves QEMU through PATH but hardcodes the firmware location,
-        # so the FHS paths it insists on are linked into place. The bundled
-        # virtiofsd needs no help: the app falls back to its own copy under
-        # resources/ when the system has none.
+        # Cowork resolves QEMU through PATH but hardcodes the firmware and
+        # virtiofsd locations, so the FHS paths it insists on are linked into
+        # place. It only falls back to its bundled virtiofsd on Ubuntu 22.04;
+        # anywhere else it reports Cowork unsupported without a system one.
+        # The bundled copy is the one Anthropic ships and tests, so that is
+        # what gets linked.
         systemd.tmpfiles.rules = [
           "L+ ${firmware.code} - - - - ${pkgs.OVMF.firmware}"
           "L+ ${firmware.vars} - - - - ${pkgs.OVMF.variables}"
+          "L+ /usr/libexec/virtiofsd - - - - ${cfg.package}/lib/claude-desktop/resources/virtiofsd"
         ];
 
         users.users = lib.genAttrs cfg.cowork.users (_: {
