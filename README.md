@@ -152,7 +152,7 @@ relative to itself. On top of that:
 
 | Path | Closure |
 | --- | --- |
-| `claude-desktop` | 899 MiB |
+| `claude-desktop` | about 920–970 MiB, depending on the release |
 | `claude-desktop.searchProvider` | +94 MiB (GJS; nothing extra where GNOME is installed) |
 | `claude-desktop.override { withCowork = false; }` | 820 MiB |
 
@@ -172,12 +172,18 @@ What keeps it there:
   `nix/xdg-shims.nix` answers those from GIO, which GTK already brings, rather
   than pulling perl in for xdg-utils. They come last on `PATH`, so a real
   xdg-utils wins where there is one.
+- **A PipeWire client library on its own.** The app's native binding links
+  `libpipewire`, and nixpkgs' `pipewire` is a single 635 MiB output with the
+  daemon's gstreamer, ffmpeg and bluez backends in it. `nix/libpipewire.nix`
+  builds it without those, since the client only talks to the system's
+  PipeWire daemon.
 - **The search provider and Chromium's 20 MiB license file in their own
   outputs** (`searchProvider` and `doc`), which a profile installs only when
   asked.
 
-`nix flake check` fails if full QEMU, systemd, perl, python, GJS or xdg-utils
-reappear in the closure, or if it grows past 1000 MiB. It also boots the
+`nix flake check` fails if full QEMU, PipeWire, systemd, perl, python, GJS or
+xdg-utils reappear in the closure, or if the dependencies, everything but the
+app's own payload, grow past 500 MiB. It also boots the
 Cowork machine shape under TCG and checks over QMP that every device came up.
 
 ### Options
@@ -253,11 +259,12 @@ nix.settings = {
 ```
 
 Everything else in the closure comes from `cache.nixos.org` as usual. Only the
-Claude Desktop outputs and the trimmed `qemu-cowork` are unique to this cache.
+Claude Desktop outputs, the trimmed `qemu-cowork` and `libpipewire` are unique
+to this cache.
 
-The cache serves the `qemu-cowork` built against this flake's nixpkgs. If you
-make the input follow your own nixpkgs, Nix builds QEMU locally instead, which
-takes a few minutes.
+The cache serves those built against this flake's nixpkgs. If you make the
+input follow your own nixpkgs, Nix builds QEMU and libpipewire locally instead,
+which takes a few minutes.
 
 ## Not covered
 

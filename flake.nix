@@ -91,27 +91,47 @@
 
           # The closure is the point of most of package.nix, so a dependency
           # that quietly drags full QEMU, perl or python back in fails here.
+          # The budget covers everything except the app's own store path:
+          # that is Anthropic's payload, and a bigger upstream release must
+          # not be able to block the hourly update.
           closure-is-slim =
+            let
+              app = self.packages.${system}.claude-desktop;
+            in
             pkgs.runCommand "claude-desktop-closure-is-slim"
               {
-                closure = pkgs.closureInfo { rootPaths = [ self.packages.${system}.claude-desktop ]; };
-                maxMiB = 1000;
+                closure = pkgs.closureInfo { rootPaths = [ app ]; };
+                inherit app;
+                maxDepsMiB = 500;
               }
               ''
-                bad=$(grep -E -- '-(qemu-[0-9]|perl-[0-9]|python3-[0-9]|spidermonkey-|gjs-|systemd-[0-9]|xdg-utils-)' \
+                bad=$(grep -E -- '-(qemu-[0-9]|perl-[0-9]|python3-[0-9]|spidermonkey-|gjs-|systemd-[0-9]|xdg-utils-|pipewire-[0-9]|ffmpeg|gstreamer-)' \
                   "$closure/store-paths" || true)
                 if [ -n "$bad" ]; then
                   echo "unwanted paths in the claude-desktop closure:" >&2
                   echo "$bad" >&2
                   exit 1
                 fi
-                size=$(( $(cat "$closure/total-nar-size") / 1048576 ))
-                echo "closure is $size MiB"
-                if [ "$size" -gt "$maxMiB" ]; then
-                  echo "closure is $size MiB, over the $maxMiB MiB budget" >&2
+
+                # registration is path, hash, size, deriver, reference count,
+                # then that many references, for each path in the closure.
+                appBytes=$(awk -v app="$app" '
+                  state == 0 { path = $0; state = 1; next }
+                  state == 1 { state = 2; next }
+                  state == 2 { if (path == app) print $0; state = 3; next }
+                  state == 3 { state = 4; next }
+                  state == 4 { refs = $0; state = refs > 0 ? 5 : 0; next }
+                  state == 5 { if (--refs == 0) state = 0 }
+                ' "$closure/registration")
+
+                total=$(( $(cat "$closure/total-nar-size") / 1048576 ))
+                deps=$(( ($(cat "$closure/total-nar-size") - appBytes) / 1048576 ))
+                echo "closure is $total MiB, of which dependencies are $deps MiB"
+                if [ "$deps" -gt "$maxDepsMiB" ]; then
+                  echo "dependencies are $deps MiB, over the $maxDepsMiB MiB budget" >&2
                   exit 1
                 fi
-                echo "$size MiB" >$out
+                echo "$total MiB total, $deps MiB dependencies" >$out
               '';
 
           # The version in sources.json has to be the version inside the

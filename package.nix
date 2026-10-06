@@ -54,6 +54,9 @@
   withCowork ? true,
   qemu-cowork ? callPackage ./nix/qemu-cowork.nix { },
   xdg-shims ? callPackage ./nix/xdg-shims.nix { },
+  # The native binding links libpipewire; see nix/libpipewire.nix for why
+  # this is not nixpkgs' pipewire.
+  libpipewire ? callPackage ./nix/libpipewire.nix { },
   # The GNOME Shell search provider is a GJS script the shell activates over
   # D-Bus. It lives in its own `searchProvider` output, so GJS is only in the
   # closure of those who install that output.
@@ -125,6 +128,7 @@ stdenv.mkDerivation (finalAttrs: {
     nspr
     nss
     pango
+    libpipewire
     # libudev and libsystemd only; `lib.getLib systemd` is the whole of
     # systemd, since it has no separate lib output.
     systemdLibs
@@ -235,7 +239,7 @@ stdenv.mkDerivation (finalAttrs: {
 
   passthru = {
     inherit (source) url;
-    inherit qemu-cowork;
+    inherit libpipewire qemu-cowork;
     updateScript = ./scripts/update.sh;
   };
 
