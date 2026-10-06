@@ -32,12 +32,12 @@ runCommand "qemu-cowork-boots" { nativeBuildInputs = [ python3 ]; } ''
   set -euo pipefail
 
   ${qemuBin} -machine help | grep -qw ${machine}
-  ${qemuBin} -accel help | grep -qw tcg
-  ${qemuBin} -accel help | grep -qw kvm
-  ${qemuBin} -netdev help | grep -qw user
-  ${qemuBin} -object help | grep -qw memory-backend-memfd
+  ${qemuBin} -machine ${machine} -accel help | grep -qw tcg
+  ${qemuBin} -machine ${machine} -accel help | grep -qw kvm
+  ${qemuBin} -machine ${machine} -netdev help | grep -qw user
+  ${qemuBin} -machine ${machine} -object help | grep -qw memory-backend-memfd
   for d in ${lib.escapeShellArgs devices}; do
-    ${qemuBin} -device help | grep -q "name \"$d\"" || {
+    ${qemuBin} -machine ${machine} -device help | grep -q "name \"$d\"" || {
       echo "qemu-cowork has no $d" >&2
       exit 1
     }
