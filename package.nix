@@ -227,9 +227,21 @@ stdenv.mkDerivation (finalAttrs: {
     install -Dm644 "$providerScripts/com.anthropic.Claude.SearchProvider.service" \
       "$searchProvider/share/dbus-1/services/com.anthropic.Claude.SearchProvider.service"
 
+    # GJS through a wrapper that unsets GI_TYPELIB_PATH. D-Bus activation
+    # hands it the session's, which on NixOS names the system's GLib
+    # typelibs: a different build from the GLib this GJS links, even at the
+    # same version. Loading Gio's typelib then pulls in that other libgio,
+    # whose types are unregistered in this process, and GJS aborts on its
+    # first interface -- "assertion failed: (gtype != G_TYPE_INVALID)" --
+    # on every search. Unset, GJS finds its own GLib's typelibs, which are
+    # all the script imports.
+    makeShellWrapper ${lib.getExe' gjs "gjs"} "$searchProvider/libexec/claude-desktop-search-provider" \
+      --unset GI_TYPELIB_PATH \
+      --add-flags "-m $providerScripts/searchProvider.js"
+
     substituteInPlace "$searchProvider/share/dbus-1/services/com.anthropic.Claude.SearchProvider.service" \
-      --replace-fail "/usr/bin/gjs" "${lib.getExe' gjs "gjs"}" \
-      --replace-fail "/usr/lib/claude-desktop/resources/gnome-search-provider" "$providerScripts"
+      --replace-fail "/usr/bin/gjs -m /usr/lib/claude-desktop/resources/gnome-search-provider/searchProvider.js" \
+        "$searchProvider/libexec/claude-desktop-search-provider"
   '';
 
   # wrapGAppsHook3 would otherwise wrap the Electron binary directly, and the
