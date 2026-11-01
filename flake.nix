@@ -2,7 +2,7 @@
   description = "Claude Desktop for Linux, pinned to Anthropic's signed apt repository";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
   };
 
   # Offered, not imposed. Nix applies these only for a trusted user, and

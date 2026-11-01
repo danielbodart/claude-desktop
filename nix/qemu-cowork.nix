@@ -20,31 +20,37 @@
   qemu,
 }:
 
-(qemu.override {
-  hostCpuTargets = [ "${stdenv.hostPlatform.qemuArch}-softmmu" ];
-  guestAgentSupport = false;
-  alsaSupport = false;
-  pulseSupport = false;
-  pipewireSupport = false;
-  jackSupport = false;
-  sdlSupport = false;
-  gtkSupport = false;
-  vncSupport = false;
-  ncursesSupport = false;
-  smartcardSupport = false;
-  spiceSupport = false;
-  usbredirSupport = false;
-  openGLSupport = false;
-  virglSupport = false;
-  rutabagaSupport = false;
-  libiscsiSupport = false;
-  tpmSupport = false;
-  fuseSupport = false;
-  capstoneSupport = false;
-  brlttySupport = false;
-  enableDocs = false;
-  enableTools = false;
-}).overrideAttrs
+(qemu.override (
+  {
+    hostCpuTargets = [ "${stdenv.hostPlatform.qemuArch}-softmmu" ];
+    guestAgentSupport = false;
+    alsaSupport = false;
+    pulseSupport = false;
+    pipewireSupport = false;
+    jackSupport = false;
+    sdlSupport = false;
+    gtkSupport = false;
+    vncSupport = false;
+    ncursesSupport = false;
+    smartcardSupport = false;
+    spiceSupport = false;
+    usbredirSupport = false;
+    openGLSupport = false;
+    virglSupport = false;
+    rutabagaSupport = false;
+    libiscsiSupport = false;
+    tpmSupport = false;
+    fuseSupport = false;
+    capstoneSupport = false;
+    enableDocs = false;
+    enableTools = false;
+  }
+  # Braille display support (brlapi) arrived after nixos-26.05; off where
+  # the qemu being overridden has it.
+  // lib.optionalAttrs (lib.functionArgs qemu.override ? brlttySupport) {
+    brlttySupport = false;
+  }
+)).overrideAttrs
   (old: {
     pname = "qemu-cowork";
 
